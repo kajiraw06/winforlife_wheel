@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WIN FOR LIFE – Wheel</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #041a0e;
+    }
+
+    #scene {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      transform-origin: top left;
+      flex-shrink: 0;
+    }
+
+    #scene img {
+      position: absolute;
+      display: block;
+    }
+
+    /* ── Individual element positions (px, relative to frame top-left) ── */
+    /* Z-indexes match Figma layer order (bottom=1, top=16) */
+
+    #bg         { left: -26px;  top: -42px;  width: 1956px; height: 1151px; z-index:  1; }
+    #logo       { left: 175px;  top:  80px;  width:  351px; height:  121px; z-index:  2; }
+    #winners    { left:  93px;  top: 619px;  width:  519px; height:  342px; z-index:  3; }
+
+    /* Live winners table — exactly matching original Figma positions */
+    /* WINNERS panel bg:   left:93  top:619  w:519 h:342               */
+    /* NAME label:         left:150 top:642  w:93  h:24                */
+    /* PRIZES label:       left:429 top:642  w:116 h:24                */
+    /* MOCK-WINNERS area:  left:130 top:699  w:414 h:242               */
+    #winners-table {
+      position: absolute;
+      left: 93px; top: 619px;
+      width: 519px; height: 342px;
+      z-index: 6;
+      font-family: 'Arial Black', Arial, sans-serif;
+      overflow: hidden;
+    }
+    #winners-table .tbl-header {
+      position: absolute;
+      left: 37px; top: 23px;
+      width: 414px;
+      display: flex;
+      align-items: center;
+      height: 24px;
+    }
+    #winners-table .tbl-header .col-name {
+      flex: 0 0 207px;
+      padding-left: 10px;
+      font-size: 26px; font-weight: 900;
+      font-style: italic;
+      color: #FFD700; text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+    #winners-table .tbl-header .col-prize {
+      flex: 0 0 207px;
+      font-size: 26px; font-weight: 900;
+      font-style: italic;
+      color: #FFD700; text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+    /* MOCK-WINNERS content area */
+    #winners-body {
+      position: absolute;
+      left: 37px;
+      top: 80px;
+      width: 414px;
+      height: 242px;
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: repeat(6, 1fr);
+    }
+    #winners-body::-webkit-scrollbar { display: none; }
+    .winner-row {
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      animation: fadeIn 0.4s ease;
+      min-height: 0;
+    }
+    .winner-row:nth-child(odd)  { background: transparent; }
+    .winner-row:nth-child(even) { background: transparent; }
+    .winner-row .col-name  { padding-left: 6px; flex: 0 0 200px; font-size: 22px; font-style: italic; color: #fff; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .winner-row .col-prize { flex: 1; font-size: 22px; font-style: italic; color: #FFD700; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* Real winner row — green highlight, NO border-left to avoid column shift */
+    .winner-row.real { background: rgba(0, 220, 100, 0.18) !important; }
+    .winner-row.real .col-name  { color: #00FF7F; }
+    .winner-row.real .col-prize { color: #FFFB00; }
+    @keyframes fadeIn { from { opacity:0; transform: translateY(-6px); } to { opacity:1; transform: translateY(0); } }
+    #backlight  { left: 493px;  top: -53px;  width: 1098px; height: 1054px; z-index:  7; }
+    #wheel-wrap { position: absolute; left: 617px;  top:  56px;  width:  850px; height:  849px; z-index:  8; cursor: pointer;
+                  background: url('assets/wheel.png') center/100% 100% no-repeat; }
+    #platform   { left: 741px;  top: 849px;  width:  703px; height:  346px; z-index: 11; }
+    #chips      { left: 799px;  top: 749px;  width:  211px; height:  143px; z-index: 12; }
+    #infinix    { left: 962px;  top: 778px;  width:  216px; height:  214px; z-index: 13; }
+    #codm       { left:1151px;  top: 718px;  width:  246px; height:  194px; z-index: 14; }
+    #headline   { left:  95px;  top: 226px;  width:  530px; height:  350px; z-index: 15; }
+    #woman      { left:1440px;  top:  88px;  width:  565px; height: 1273px; z-index: 16; }
+
+    /* Wheel rotation */
+    #wheel-canvas { display: block; width: 100%; height: 100%; background: transparent; }
+
+    /* ── Entry management modal ── */
+    #entry-modal {
+      display: none; position: absolute; left: 0; top: 0;
+      width: 1920px; height: 1080px;
+      background: rgba(0,0,0,0.72);
+      z-index: 100; align-items: center; justify-content: center;
+    }
+    #entry-modal.show { display: flex; }
+    #entry-panel {
+      background: linear-gradient(145deg, #0d2a1f, #0a1f2e);
+      border: 2px solid #C9A84C; border-radius: 18px;
+      padding: 32px; width: 720px; max-height: 750px;
+      display: flex; flex-direction: column; gap: 16px;
+      box-shadow: 0 0 50px rgba(201,168,76,0.35), 0 0 100px rgba(11,107,90,0.25);
+    }
+    #entry-panel h2 {
+      margin: 0; color: #C9A84C;
+      font-family: 'Arial Black', Arial, sans-serif;
+      font-size: 26px; text-align: center; letter-spacing: 4px;
+    }
+    #entry-list {
+      overflow-y: auto; max-height: 400px;
+      display: flex; flex-direction: column; gap: 7px;
+    }
+    #entry-list::-webkit-scrollbar { width: 6px; }
+    #entry-list::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 3px; }
+    #entry-list::-webkit-scrollbar-thumb { background: #C9A84C; border-radius: 3px; }
+    .entry-item {
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(201,168,76,0.2);
+      border-radius: 8px; padding: 8px 12px;
+    }
+    .e-num  { color: #C9A84C; font-weight: 900; font-size: 17px; width: 28px; flex-shrink: 0; font-family: 'Arial Black', Arial; }
+    .e-name { flex: 1; color: #fff; font-size: 19px; font-weight: 700; font-family: Arial; }
+    .e-prize { flex: 1; color: #FFD700; font-size: 17px; font-family: Arial; }
+    .e-del  { width: 30px; height: 30px; flex-shrink: 0; background: rgba(200,50,50,0.6); border: none; border-radius: 6px; color: #fff; font-size: 16px; font-weight: bold; cursor: pointer; }
+    .e-del:hover { background: rgb(220,60,60); }
+    #entry-add-row { display: flex; gap: 10px; }
+    #entry-count { text-align:center; font-size:15px; color:rgba(201,168,76,0.7); font-family:Arial; margin-top:-6px; }
+    #bulk-area {
+      width:100%; height:80px; resize:none;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(201,168,76,0.3);
+      border-radius: 8px; color:#fff; font-size:14px; font-family:Arial; padding:8px 12px;
+    }
+    #bulk-area::placeholder { color:rgba(255,255,255,0.3); }
+    #bulk-area:focus { outline:none; border-color:#C9A84C; }
+    #bulk-row { display:flex; gap:10px; align-items:flex-start; }
+    #btn-bulk-add {
+      padding:10px 18px; white-space:nowrap;
+      background: linear-gradient(135deg,#1A4F72,#0d2a3d);
+      border:1px solid rgba(201,168,76,0.5); border-radius:8px;
+      color:#fff; font-size:15px; font-weight:900; font-family:'Arial Black',Arial; cursor:pointer;
+    }
+    #btn-bulk-add:hover { border-color:#C9A84C; background:linear-gradient(135deg,#2260a0,#1A4F72); }
+    #btn-clear-all {
+      padding:10px 18px;
+      background:rgba(180,30,30,0.35); border:1px solid rgba(255,80,80,0.3);
+      border-radius:8px; color:#ff8888; font-size:15px; font-weight:bold;
+      font-family:Arial; cursor:pointer; white-space:nowrap;
+    }
+    #btn-clear-all:hover { background:rgba(220,40,40,0.5); color:#fff; }
+    #new-entry-name {
+      flex: 1; padding: 10px 14px;
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(201,168,76,0.4);
+      border-radius: 8px; color: #fff; font-size: 17px; font-family: Arial;
+    }
+    #new-entry-name::placeholder { color: rgba(255,255,255,0.35); }
+    #new-entry-name:focus { outline: none; border-color: #C9A84C; }
+    #btn-add-entry {
+      padding: 10px 22px;
+      background: linear-gradient(135deg, #C9A84C, #8B6914);
+      border: none; border-radius: 8px;
+      color: #000; font-size: 17px; font-weight: 900;
+      font-family: 'Arial Black', Arial; cursor: pointer; white-space: nowrap;
+    }
+    #btn-add-entry:hover { background: linear-gradient(135deg, #FADA5E, #C9A84C); }
+    #entry-modal-actions { display: flex; justify-content: center; gap: 16px; }
+    #btn-spin-from-modal {
+      padding: 14px 55px;
+      background: linear-gradient(135deg, #0B7B6B, #063D35);
+      border: 2px solid #C9A84C; border-radius: 10px;
+      color: #fff; font-size: 24px; font-weight: 900;
+      font-family: 'Arial Black', Arial; cursor: pointer; letter-spacing: 3px;
+    }
+    #btn-spin-from-modal:hover { background: linear-gradient(135deg, #15A689, #0B7B6B); }
+    #btn-close-entry-modal {
+      padding: 14px 30px;
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 10px; color: #aaa; font-size: 19px; font-weight: bold;
+      font-family: Arial; cursor: pointer;
+    }
+    #btn-close-entry-modal:hover { background: rgba(255,255,255,0.15); color: #fff; }
+
+    /* ── Winner overlay ── */
+    #winner-overlay {
+      display: none;
+      position: absolute;
+      left: 50%; top: 46%;
+      transform: translate(-50%, -50%);
+      z-index: 99;
+      width: 769px;   /* Artboard 1.png at 70% of 1098 */
+      height: 734px;  /* Artboard 1.png at 70% of 1049 */
+    }
+    #winner-overlay.show { display: block; animation: woIn 0.4s cubic-bezier(.22,1.4,.6,1) both; }
+    @keyframes woIn {
+      from { transform: translate(-50%,-50%) scale(0.6); opacity: 0; }
+      to   { transform: translate(-50%,-50%) scale(1);   opacity: 1; }
+    }
+
+    /* Artboard composite background (starburst + card + Winner + Congrats + CLOSE all baked in) */
+    #wo-bg {
+      position: absolute;
+      inset: 0;
+      width: 100%; height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Winner name text — sits over the dark name slot in the card */
+    /* Artboard slot: x245-830, y395-520 (full 1098×1049). Scaled 70%: */
+    /* slot top = 395/1049*734 ≈ 276px, height = 125/1049*734 ≈ 87px   */
+    /* slot width = 585/1098*769 ≈ 410px, centered                      */
+    #winner-name {
+      position: absolute;
+      z-index: 2;
+      top: 276px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 410px;
+      height: 87px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Arial Black', Arial, sans-serif;
+      font-size: 36px;
+      font-weight: 900;
+      color: #fff;
+      text-align: center;
+      letter-spacing: 2px;
+      text-shadow: 0 0 18px rgba(255,220,80,0.7), 0 2px 8px rgba(0,0,0,0.9);
+      word-break: break-word;
+      line-height: 1.2;
+    }
+
+    /* Invisible CLOSE hit area — sits over the CLOSE BUTTON baked into the artboard */
+    /* Artboard close button: y≈610-660, centered. Scaled 70%: top≈427px             */
+    #close-btn {
+      position: absolute;
+      z-index: 4;
+      width: 181px;         /* 258/1098 * 769 */
+      height: 56px;
+      top: 422px;           /* 610/1049 * 734 = 427, pull up 5px for hit area */
+      left: 50%;
+      transform: translateX(-50%);
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      padding: 0;
+      border-radius: 50px;
+    }
+    #close-btn:hover  { background: rgba(255,255,255,0.12); }
+    #close-btn:active { background: rgba(255,255,255,0.06); }
+  </style>
+</head>
+<body>
+<div id="scene">
+
+  <!-- Layer order matches Figma exactly (bottom → top) -->
+  <img id="bg"         src="assets/background.png"    alt="background" />
+  <img id="logo"       src="assets/logo.png"           alt="Logo" />
+  <img id="winners"    src="assets/winners.png"        alt="Winners Panel" />
+
+  <!-- Live winners table -->
+  <div id="winners-table">
+    <div class="tbl-header">
+      <span class="col-name">NAME</span>
+      <span class="col-prize">PRIZES</span>
+    </div>
+    <div id="winners-body"></div>
+  </div>
+  <img id="backlight"  src="assets/backlight.png"      alt="Backlight" />
+  <div id="wheel-wrap">
+    <canvas id="wheel-canvas" width="850" height="849"></canvas>
+  </div>
+  <img id="platform"   src="assets/platform.png"       alt="Platform" />
+  <img id="chips"      src="assets/chips.png"          alt="Chips" />
+  <img id="infinix"    src="assets/infinix_gt30.png"   alt="Infinix GT30 Pro" />
+  <img id="codm"       src="assets/codm_prize.png"     alt="CODM 5000 Full Draw" />
+  <!-- Headline and Woman are ABOVE the wheel in Figma layer order -->
+  <img id="headline"   src="assets/headline.png"       alt="Headline" />
+  <img id="woman"      src="assets/woman.png"          alt="Woman" />
+
+  <!-- Winner announcement overlay -->
+  <div id="winner-overlay">
+    <img id="wo-bg" src="assets/Artboard 1.png" alt="" />
+    <div id="winner-name"></div>
+    <button id="close-btn" onclick="closeOverlay()" aria-label="Close"></button>
+  </div>
+
+  <!-- Entry management modal -->
+  <div id="entry-modal">
+    <div id="entry-panel">
+      <h2>&#9654; MANAGE ENTRIES &nbsp;<span id="entry-count"></span></h2>
+      <div id="entry-list"></div>
+      <div id="entry-add-row">
+        <input id="new-entry-name" type="text" placeholder="Player name..." maxlength="60" />
+        <button id="btn-add-entry" onclick="addEntry()">+ ADD</button>
+      </div>
+      <div id="bulk-row">
+        <textarea id="bulk-area" placeholder="Bulk import — paste names separated by commas or new lines, then click IMPORT"></textarea>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button id="btn-bulk-add" onclick="bulkImport()">&#8659; IMPORT</button>
+          <button id="btn-clear-all" onclick="clearAllEntries()">&#128465; CLEAR ALL</button>
+        </div>
+      </div>
+      <div id="entry-modal-actions">
+        <button id="btn-spin-from-modal" onclick="spinFromModal()">SPIN!</button>
+        <button id="btn-close-entry-modal" onclick="closeEntryModal()">CLOSE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- (rig system is keyboard-only, no DOM elements needed) -->
+
+</div>
+
+<script>
+  // ── Entries (editable) ───────────────────────────────────────────────
+  let ENTRIES = [
+    { name: 'Player 1', prize: 'Infinix GT30 Pro' },
+    { name: 'Player 2', prize: 'CODM 5,000 Full Draw' },
+    { name: 'Player 3', prize: '20 CHIPS' },
+    { name: 'Player 4', prize: 'Infinix GT30 Pro' },
+    { name: 'Player 5', prize: 'CODM 5,000 Full Draw' },
+    { name: 'Player 6', prize: '20 CHIPS' },
+    { name: 'Player 7', prize: 'Infinix GT30 Pro' },
+    { name: 'Player 8', prize: 'CODM 5,000 Full Draw' },
+  ];
+
+  const PRIZES    = ['20 CHIPS', 'Infinix GT30 Pro', 'CODM 5,000 Full Draw'];
+  const NAME_PARTS = ['Ra','Mi','Ja','Ke','An','Le','Sa','De','Ch','Jo','Lu','Fr','Ni','Ca','Ma','Al','Ro','He','Pa','Gi'];
+
+  // ── Fake winners ticker ──────────────────────────────────────────────
+  function randomFakeName() {
+    return NAME_PARTS[Math.floor(Math.random() * NAME_PARTS.length)] + '*'.repeat(8);
+  }
+  function populateFakeRows(count) {
+    const body = document.getElementById('winners-body');
+    body.innerHTML = '';
+    for (let i = 0; i < count; i++) {
+      const row = document.createElement('div');
+      row.className = 'winner-row';
+      const prize = PRIZES[Math.floor(Math.random() * PRIZES.length)];
+      row.innerHTML = '<span class="col-name">' + randomFakeName() + '</span>' +
+                      '<span class="col-prize">' + prize + '</span>';
+      body.appendChild(row);
+    }
+  }
+  populateFakeRows(6);
+  setInterval(() => populateFakeRows(6), 10000);
+
+  // ── Canvas wheel ────────────────────────────────────────────────────
+  const SEG_COLORS = ['#C9A84C', '#0B6B5A', '#145A32']; // gold · deep teal · emerald green
+  let   wheelAngle = 0;
+  let   isSpinning = false;
+
+  // Offscreen canvases — rebuilt only when entries change, not every frame
+  const W = 850, H = 849, cx = W/2, cy = H/2;
+  const TWO_PI  = Math.PI * 2;
+  const outerR  = 415;
+  const segR    = 355;
+  const innerR  = 138;
+  const centerR = 116;
+
+  let segOffscreen    = null; // pre-rendered segments at angle=0
+  let staticOffscreen = null; // arrow + spin button (redrawn only when PNGs load)
+
+  const arrowImg = new Image();
+  arrowImg.src = 'assets/arrow.png';
+  arrowImg.onload = () => { buildStaticLayer(); drawWheel(wheelAngle); };
+
+  const spinImg = new Image();
+  spinImg.src = 'assets/spin_button.png';
+  spinImg.onload = () => { buildStaticLayer(); drawWheel(wheelAngle); };
+
+  function hexRgb(h) {
+    return { r: parseInt(h.slice(1,3),16), g: parseInt(h.slice(3,5),16), b: parseInt(h.slice(5,7),16) };
+  }
+  function lighten(hex, a) { const {r,g,b}=hexRgb(hex); return `rgb(${Math.min(255,r+a)},${Math.min(255,g+a)},${Math.min(255,b+a)})`;}
+  function darken (hex, a) { const {r,g,b}=hexRgb(hex); return `rgb(${Math.max(0,r-a)},${Math.max(0,g-a)},${Math.max(0,b-a)})`;}
+
+  // Build the non-rotating layer (arrow + spin button) — called once on load
+  function buildStaticLayer() {
+    staticOffscreen = document.createElement('canvas');
+    staticOffscreen.width  = W;
+    staticOffscreen.height = H;
+    const ctx = staticOffscreen.getContext('2d');
+    if (spinImg.complete && spinImg.naturalWidth) {
+      const sw = centerR * 1.5, sh = centerR * 1.5;
+      ctx.drawImage(spinImg, cx - sw/2, cy - sh/2, sw, sh);
+    }
+    if (arrowImg.complete && arrowImg.naturalWidth) {
+      const aw = 62, ah = 83;
+      ctx.drawImage(arrowImg, cx - aw/2, cy - outerR + ah*0.35, aw, ah);
+    }
+  }
+
+  // Build the rotating segments layer — called only when ENTRIES changes
+  function buildSegLayer() {
+    segOffscreen = document.createElement('canvas');
+    segOffscreen.width  = W;
+    segOffscreen.height = H;
+    const ctx = segOffscreen.getContext('2d');
+    const n   = Math.max(ENTRIES.length, 1);
+    const segA = TWO_PI / n;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    for (let i = 0; i < n; i++) {
+      const start = -Math.PI / 2 + i * segA;
+      const end   = start + segA;
+      const mid   = start + segA / 2;
+      const col   = SEG_COLORS[i % SEG_COLORS.length];
+
+      // Base fill — radial gradient
+      const hx = Math.cos(mid) * segR * 0.55;
+      const hy = Math.sin(mid) * segR * 0.55;
+      const grd = ctx.createRadialGradient(hx * 0.45, hy * 0.45, segR * 0.05, hx, hy, segR * 1.05);
+      grd.addColorStop(0,    lighten(col, 72));
+      grd.addColorStop(0.18, lighten(col, 42));
+      grd.addColorStop(0.55, col);
+      grd.addColorStop(0.82, darken(col, 28));
+      grd.addColorStop(1,    darken(col, 55));
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, segR, start, end);
+      ctx.closePath();
+      ctx.fillStyle = grd;
+      ctx.fill();
+
+      // Edge vignette
+      const edgeFade = ctx.createLinearGradient(
+        Math.cos(start) * segR * 0.8, Math.sin(start) * segR * 0.8,
+        Math.cos(end)   * segR * 0.8, Math.sin(end)   * segR * 0.8
+      );
+      edgeFade.addColorStop(0,    'rgba(0,0,0,0.28)');
+      edgeFade.addColorStop(0.12, 'rgba(0,0,0,0)');
+      edgeFade.addColorStop(0.88, 'rgba(0,0,0,0)');
+      edgeFade.addColorStop(1,    'rgba(0,0,0,0.28)');
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, segR, start, end);
+      ctx.closePath();
+      ctx.fillStyle = edgeFade;
+      ctx.fill();
+
+      // Gold divider
+      const gline = ctx.createLinearGradient(
+        Math.cos(start) * innerR * 0.5, Math.sin(start) * innerR * 0.5,
+        Math.cos(start) * segR,         Math.sin(start) * segR
+      );
+      gline.addColorStop(0,   'rgba(201,168,76,0)');
+      gline.addColorStop(0.3, 'rgba(201,168,76,0.7)');
+      gline.addColorStop(1,   'rgba(201,168,76,0.25)');
+      ctx.beginPath();
+      ctx.moveTo(innerR * Math.cos(start), innerR * Math.sin(start));
+      ctx.lineTo(segR   * Math.cos(start), segR   * Math.sin(start));
+      ctx.strokeStyle = gline;
+      ctx.lineWidth   = 1.5;
+      ctx.stroke();
+
+      // Entry name — skip when too many segments to read anyway
+      if (ENTRIES[i] && n <= 500) {
+        ctx.save();
+        ctx.rotate(mid);
+        ctx.textAlign    = 'right';
+        ctx.textBaseline = 'middle';
+        const fs = Math.max(8, Math.min(20, 290 / n));
+        ctx.font = `bold italic ${fs}px Arial`;
+        ctx.shadowColor   = 'rgba(0,0,0,0.95)';
+        ctx.shadowBlur    = 4;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+        ctx.fillStyle = '#fff';
+        ctx.fillText(ENTRIES[i].name, segR - 16, 0);
+        ctx.restore();
+      }
+    }
+    ctx.restore();
+  }
+
+  // Main draw — per-frame cost is now just 3 canvas operations
+  function drawWheel(angle) {
+    const canvas = document.getElementById('wheel-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    if (!segOffscreen)    buildSegLayer();
+    if (!staticOffscreen) buildStaticLayer();
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Clip to ring area
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, 358, 0, TWO_PI);
+    ctx.clip();
+
+    // Blit the pre-rendered segments, rotated
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+    ctx.drawImage(segOffscreen, -cx, -cy);
+    ctx.restore();
+
+    ctx.restore(); // end clip
+
+    // Blit static overlay (arrow + spin button) — always on top, never rotates
+    if (staticOffscreen) ctx.drawImage(staticOffscreen, 0, 0);
+  }
+
+  // ── Rig system (fully invisible — keyboard buffer only) ─────────────
+  let riggedIndex = -1;
+  let rigMode     = false;
+  let rigBuffer   = '';
+
+  document.addEventListener('keydown', e => {
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+    // Backtick — enter rig mode (ignore key-repeat while held)
+    if (e.key === '`') {
+      e.preventDefault();
+      if (!rigMode) { rigMode = true; rigBuffer = ''; }
+      return; // always swallow backtick — never add it to buffer
+    }
+
+    if (!rigMode) return;
+
+    // ── Inside rig mode ───────────────────────────────────────────────
+    e.preventDefault();
+
+    if (e.key === 'Escape')    { rigMode = false; rigBuffer = ''; return; }
+    if (e.key === 'Backspace') { rigBuffer = rigBuffer.slice(0, -1); return; }
+    if (e.key === 'Enter') {
+      const q = rigBuffer.trim().toLowerCase();
+      if (q) {
+        const hit = ENTRIES
+          .map((en, i) => ({ en, i }))
+          .find(({ en }) => en.name.toLowerCase().includes(q));
+        if (hit) riggedIndex = hit.i;
+      }
+      rigMode = false; rigBuffer = '';
+      return;
+    }
+    if (e.key.length === 1) rigBuffer += e.key;
+  });
+
+  // ── Spin logic (requestAnimationFrame) ──────────────────────────────
+  function spinWheel() {
+    if (isSpinning || ENTRIES.length === 0) return;
+    isSpinning = true;
+    const TWO_PI = Math.PI * 2;
+    const n      = ENTRIES.length;
+    const segA   = TWO_PI / n;
+
+    // Determine target index — rigged or random
+    let targetIdx;
+    if (riggedIndex >= 0 && riggedIndex < n) {
+      targetIdx = riggedIndex;
+    } else {
+      targetIdx = Math.floor(Math.random() * n);
+    }
+    riggedIndex = -1; // consume the rig
+
+    // Aim the wheel so targetIdx ends up under the arrow.
+    // Winner detection: norm = (-wheelAngle mod TWO_PI), idx = floor(norm/segA)
+    // So we need: (-wheelAngle_final) mod TWO_PI = targetCenter
+    // => wheelAngle_final ≡ -targetCenter  (mod TWO_PI)
+    // => needed ≡ -targetCenter - wheelAngle  (mod TWO_PI)
+    const targetCenter = targetIdx * segA + segA * 0.5;
+    let needed = ((-targetCenter - wheelAngle) % TWO_PI + TWO_PI) % TWO_PI;
+    if (needed < 0.05) needed += TWO_PI; // keep away from exact boundary
+    // Add random full rotations (5-9) so it looks like a real spin
+    const extraRounds = (5 + Math.floor(Math.random() * 5)) * TWO_PI;
+    const totalSpin  = extraRounds + needed;
+    const duration   = 4000 + Math.random() * 1500;
+    const startAngle = wheelAngle;
+    const startTime  = performance.now();
+    function ease(t) { return 1 - Math.pow(1 - t, 4); }
+    function tick(now) {
+      const t = Math.min((now - startTime) / duration, 1);
+      wheelAngle = startAngle + totalSpin * ease(t);
+      drawWheel(wheelAngle);
+      if (t < 1) {
+        requestAnimationFrame(tick);
+      } else {
+        isSpinning = false;
+        // Normalise accumulated angle to [0, TWO_PI) — prevents float drift on repeated spins
+        wheelAngle = ((wheelAngle % TWO_PI) + TWO_PI) % TWO_PI;
+        // Re-derive winner from final angle
+        const norm = ((-wheelAngle % TWO_PI) + TWO_PI) % TWO_PI;
+        const idx  = Math.floor(norm / segA) % n;
+        const winner = ENTRIES[idx];
+        ENTRIES.splice(idx, 1);
+        segOffscreen = null;
+        drawWheel(wheelAngle);
+        showWinner(winner);
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // ── Canvas click: center = spin, outer = entry modal ────────────────
+  function onWheelClick(e) {
+    const canvas = document.getElementById('wheel-canvas');
+    const rect   = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (850 / rect.width);
+    const my = (e.clientY - rect.top)  * (849 / rect.height);
+    const dist = Math.sqrt((mx - 425) ** 2 + (my - 424.5) ** 2);
+    if (dist <= 116) {
+      spinWheel();
+    } else if (dist <= 382 && !isSpinning) {
+      openEntryModal();
+    }
+  }
+
+  // ── Entry management ─────────────────────────────────────────────────
+  function openEntryModal() {
+    renderEntryList();
+    document.getElementById('entry-modal').classList.add('show');
+  }
+  function closeEntryModal() {
+    document.getElementById('entry-modal').classList.remove('show');
+    // Return focus to body so the rig keydown handler is never blocked
+    if (document.activeElement) document.activeElement.blur();
+  }
+  function renderEntryList() {
+    const list = document.getElementById('entry-list');
+    const countEl = document.getElementById('entry-count');
+    if (countEl) countEl.textContent = ENTRIES.length ? `(${ENTRIES.length})` : '';
+    list.innerHTML = '';
+    // Only render last 200 in the DOM — avoids 10k row lag in the list UI
+    const display = ENTRIES.length > 200 ? ENTRIES.slice(-200) : ENTRIES;
+    const offset  = ENTRIES.length > 200 ? ENTRIES.length - 200 : 0;
+    if (offset > 0) {
+      const note = document.createElement('div');
+      note.style.cssText = 'text-align:center;color:rgba(201,168,76,0.6);font-size:13px;padding:4px 0;';
+      note.textContent = `\u2026 ${offset} earlier entries not shown \u2026`;
+      list.appendChild(note);
+    }
+    display.forEach((e, i) => {
+      const item = document.createElement('div');
+      item.className = 'entry-item';
+      item.innerHTML = `<span class="e-num">${offset + i + 1}</span>` +
+                       `<span class="e-name">${e.name}</span>` +
+                       `<button class="e-del" onclick="deleteEntry(${offset + i})">&#x2715;</button>`;
+      list.appendChild(item);
+    });
+  }
+  function deleteEntry(i) {
+    ENTRIES.splice(i, 1);
+    segOffscreen = null;
+    renderEntryList();
+    drawWheel(wheelAngle);
+  }
+  function addEntry() {
+    const nameEl = document.getElementById('new-entry-name');
+    const name   = nameEl.value.trim();
+    if (!name) return;
+    ENTRIES.push({ name, prize: '' });
+    segOffscreen = null;
+    nameEl.value = '';
+    renderEntryList();
+    drawWheel(wheelAngle);
+  }
+  function bulkImport() {
+    const ta = document.getElementById('bulk-area');
+    const raw = ta.value;
+    if (!raw.trim()) return;
+    const names = raw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+    names.forEach(name => ENTRIES.push({ name, prize: '' }));
+    segOffscreen = null;
+    ta.value = '';
+    renderEntryList();
+    drawWheel(wheelAngle);
+  }
+  function clearAllEntries() {
+    if (!confirm(`Remove all ${ENTRIES.length} entries?`)) return;
+    ENTRIES.length = 0;
+    segOffscreen = null;
+    renderEntryList();
+    drawWheel(wheelAngle);
+  }
+  function spinFromModal() {
+    closeEntryModal();
+    setTimeout(spinWheel, 300);
+  }
+
+  // ── Winner overlay ───────────────────────────────────────────────────
+  function showWinner(winner) {
+    document.getElementById('winner-name').textContent = winner.name;
+    document.getElementById('winner-overlay').classList.add('show');
+    addWinnerRow(winner, true);
+  }
+  function closeOverlay() {
+    document.getElementById('winner-overlay').classList.remove('show');
+  }
+  function addWinnerRow(winner, isReal) {
+    const body = document.getElementById('winners-body');
+    const row  = document.createElement('div');
+    row.className = 'winner-row' + (isReal ? ' real' : '');
+    const masked = winner.name.slice(0, 2) + '*'.repeat(Math.max(3, winner.name.length - 2));
+    row.innerHTML = '<span class="col-name">' + masked + '</span><span class="col-prize">' + winner.prize + '</span>';
+    body.insertBefore(row, body.firstChild);
+  }
+
+  // ── Auto-scale scene ─────────────────────────────────────────────────
+  function scaleScene() {
+    const scene  = document.getElementById('scene');
+    const scaleX = window.innerWidth  / 1920;
+    const scaleY = window.innerHeight / 1080;
+    const scale  = Math.min(scaleX, scaleY);
+    const offsetX = (window.innerWidth  - 1920 * scale) / 2;
+    const offsetY = (window.innerHeight - 1080 * scale) / 2;
+    scene.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+  }
+  scaleScene();
+  window.addEventListener('resize', scaleScene);
+
+  // ── Init ─────────────────────────────────────────────────────────────
+  window.addEventListener('load', () => {
+    drawWheel(wheelAngle);
+    document.getElementById('wheel-canvas').addEventListener('click', onWheelClick);
+    document.getElementById('new-entry-name').addEventListener('keydown', e => {
+      if (e.key === 'Enter') addEntry();
+    });
+  });
+</script>
+</body>
+</html>

@@ -145,7 +145,7 @@
       border: 1px solid rgba(201,168,76,0.2);
       border-radius: 8px; padding: 8px 12px;
     }
-    .e-num  { color: #C9A84C; font-weight: 900; font-size: 17px; width: 28px; flex-shrink: 0; font-family: 'Arial Black', Arial; }
+    .e-num  { color: #C9A84C; font-weight: 900; font-size: 17px; min-width: 48px; flex-shrink: 0; font-family: 'Arial Black', Arial; text-align: right; padding-right: 6px; }
     .e-name { flex: 1; color: #fff; font-size: 19px; font-weight: 700; font-family: Arial; }
     .e-prize { flex: 1; color: #FFD700; font-size: 17px; font-family: Arial; }
     .e-del  { width: 30px; height: 30px; flex-shrink: 0; background: rgba(200,50,50,0.6); border: none; border-radius: 6px; color: #fff; font-size: 16px; font-weight: bold; cursor: pointer; }
@@ -657,15 +657,8 @@
     const countEl = document.getElementById('entry-count');
     if (countEl) countEl.textContent = ENTRIES.length ? `(${ENTRIES.length})` : '';
     list.innerHTML = '';
-    // Only render last 200 in the DOM — avoids 10k row lag in the list UI
-    const display = ENTRIES.length > 200 ? ENTRIES.slice(-200) : ENTRIES;
-    const offset  = ENTRIES.length > 200 ? ENTRIES.length - 200 : 0;
-    if (offset > 0) {
-      const note = document.createElement('div');
-      note.style.cssText = 'text-align:center;color:rgba(201,168,76,0.6);font-size:13px;padding:4px 0;';
-      note.textContent = `\u2026 ${offset} earlier entries not shown \u2026`;
-      list.appendChild(note);
-    }
+    const display = ENTRIES;
+    const offset  = 0;
     display.forEach((e, i) => {
       const item = document.createElement('div');
       item.className = 'entry-item';
